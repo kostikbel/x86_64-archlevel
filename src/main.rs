@@ -321,6 +321,8 @@ fn report_not_supported<'a, C>(cpu: &'a C, level: &'a X8664Level<'a>)
 	    } else {
 		report_not_supported(cpu, l)
 	    }
+	} else {
+	    println!("{}", level.why_not_supported(cpu));
 	}
     }
 }
