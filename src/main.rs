@@ -43,7 +43,7 @@ struct CPUFeatureDescr {
 }
 
 trait X86CPU {
-    fn reg(self: &Self, leaf: u32, subleaf: u32, reg: Reg) -> Option<u32>;
+    fn reg(&self, leaf: u32, subleaf: u32, reg: Reg) -> Option<u32>;
 }
 
 impl CPUFeatureDescr {
@@ -76,7 +76,7 @@ impl<'a> X8664Level<'a> {
 	X8664Level {
 	    name: String::from(name),
 	    features: Vec::<CPUFeatureDescr>::new(),
-	    parent: parent,
+	    parent,
 	}
     }
     fn add_feature(&mut self, feat: CPUFeatureDescr) {
@@ -101,7 +101,7 @@ impl<'b> X8664LevelInterface<'b> for X8664Level<'b> {
 	};
 	if p {
 	    self.get_features()
-		.fold(true, |res, feat| res && feat.is_supported(cpu))
+		.all(|feat| feat.is_supported(cpu))
 	} else {
 	    false
 	}
@@ -223,7 +223,7 @@ fn create_level1<'a>() -> X8664Level<'a> {
 }
 
 fn create_level2<'a>(level1: &'a X8664Level) -> X8664Level<'a> {
-    let mut m2 = X8664Level::new("v2", Some(&level1));
+    let mut m2 = X8664Level::new("v2", Some(level1));
     m2.add_feature(CPUFeatureDescr {
 	name: "cx16", leaf: CPUID1_LEAF, subleaf: 0, reg: Reg::ECX,
 	mask: CPUID2_CX16});
@@ -246,7 +246,7 @@ fn create_level2<'a>(level1: &'a X8664Level) -> X8664Level<'a> {
 }
 
 fn create_level3<'a>(level2: &'a X8664Level) -> X8664Level<'a> {
-    let mut m3 = X8664Level::new("v3", Some(&level2));
+    let mut m3 = X8664Level::new("v3", Some(level2));
     m3.add_feature(CPUFeatureDescr {
 	name: "avx", leaf: CPUID1_LEAF, subleaf: 0, reg: Reg::ECX,
 	mask: CPUID2_AVX});
@@ -278,7 +278,7 @@ fn create_level3<'a>(level2: &'a X8664Level) -> X8664Level<'a> {
 }
 
 fn create_level4<'a>(level3: &'a X8664Level) -> X8664Level<'a> {
-    let mut m4 = X8664Level::new("v4", Some(&level3));
+    let mut m4 = X8664Level::new("v4", Some(level3));
     m4.add_feature(CPUFeatureDescr {
 	name: "avx512f", leaf: CPUID_STDEXT_LEAF, subleaf: 0, reg: Reg::EBX,
 	mask: CPUID_STDEXT_AVX512F});
@@ -297,8 +297,8 @@ fn create_level4<'a>(level3: &'a X8664Level) -> X8664Level<'a> {
     m4
 }
 
-fn report_max_level<'a, 'b, C>(cpu: &'a C, level: &'a X8664Level<'a>,
-      args: &'b AArgs) where C: X86CPU {
+fn report_max_level<'a, C>(cpu: &'a C, level: &'a X8664Level<'a>,
+      args: &AArgs) where C: X86CPU {
     if level.is_supported(cpu) {
 	if args.explain {
 	    println!("Current CPU x86_64 level is {}", level.get_name());
@@ -312,14 +312,14 @@ fn report_max_level<'a, 'b, C>(cpu: &'a C, level: &'a X8664Level<'a>,
     }
 }
 
-fn report_not_supported<'a, 'b, C>(cpu: &'a C, level: &'a X8664Level<'a>,
-      args: &'b AArgs) where C: X86CPU {
+fn report_not_supported<'a, C>(cpu: &'a C, level: &'a X8664Level<'a>)
+      where C: X86CPU {
     if !level.is_supported(cpu) {
 	if let Some(l) = level.get_parent() {
 	    if l.is_supported(cpu) {
 		println!("{}", level.why_not_supported(cpu));
 	    } else {
-		report_not_supported(cpu, l, args)
+		report_not_supported(cpu, l)
 	    }
 	}
     }
@@ -336,6 +336,6 @@ fn main() {
 
     report_max_level(&cpu, &level4, &args);
     if args.explain {
-	report_not_supported(&cpu, &level4, &args)
+	report_not_supported(&cpu, &level4)
     }
 }
